@@ -10,7 +10,7 @@
     "build": "babel src/ -d dist/ --presets es2015",
     "start": "node dist/server.js"
   },
-  "author": "Benjamin Monge",
+  "author": "Benjamin Monge, Marvin Barahona",
   "license": "MIT",
   "devDependencies": {
     "babel-cli": "^6.26.0",

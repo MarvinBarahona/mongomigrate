@@ -9,12 +9,15 @@ function getCollectionNames() {
   return new Promise((resolve, reject)=>{
 
     mongo.connect(process.env.MONGO_URL, (err, client)=>{
+      console.log("Connected to MongoDB")
 
       if(err){
         console.log(err);
         reject(err)
       }
+
       let database = client.db(process.env.MONGO_DB_NAME)
+
       let collectionNames = []
       /*Streaming the collection*/
       /*Create all the tables*/
@@ -25,6 +28,7 @@ function getCollectionNames() {
             collectionNames.push(collName)
           }
         }
+        client.close()
         resolve(collectionNames)
       })
     })
@@ -46,8 +50,9 @@ function initiateTable(collName, sequelizeDb) {
 
       // We get a document from the collection to create a schema, this works assuming all documents are equal
       database.collection(collName).find().limit(1).forEach(document=>{
-          getSchema(document, sequelizeDb, collName)
-		  resolve()
+        getSchema(document, sequelizeDb, collName)
+        client.close()
+        resolve()
       })
     })
   })
@@ -67,6 +72,8 @@ function getSchema(obj, sequelizeDb, name=null, parent=null) {
       table[parent+'_id'] = 'string'
       name = parent + "_" + name
     }
+
+    console.log("Creating " + name + " model")
 
     for (var key in obj) {
         if(typeof obj[key] != "function"){     //we don't want to print functions
@@ -99,7 +106,6 @@ function getSchema(obj, sequelizeDb, name=null, parent=null) {
             }
         }
     }
-
     createTable(table, sequelizeDb, name)
 }
 
@@ -134,6 +140,7 @@ function createTable(schema, conn, modelName) {
   const model = conn.sequelize.define(modelName, schema, {freezeTableName: true})
   conn[model.name] = model
 
+  console.log(modelName + " model created")
   return model
 }
 
@@ -142,6 +149,7 @@ function createTable(schema, conn, modelName) {
 // sequelizeDb is the sequelize collection
 // Uses data streams to avoid massive memory usage while querying possibly huge mongodb collections
 function fillTable(name, sequelizeDb) {
+  console.log("Filling " + name + " tables")
   return new Promise((resolve, reject)=>{
     mongo.connect(process.env.MONGO_URL, (err, client)=>{
         if(err){
@@ -165,6 +173,7 @@ function fillTable(name, sequelizeDb) {
         })
 
         dataStream.on('end', ()=>{
+          console.log(name + " tables filled")
           client.close()
           resolve()
         })
@@ -220,8 +229,6 @@ function insertRow(obj, name, sequelizeDb, promiseArray, parentName=null, parent
 
   // We create the promise to insert the row with the custom schema
   promiseArray.push(sequelizeDb[name].create(table))
-
-
 }
 
 

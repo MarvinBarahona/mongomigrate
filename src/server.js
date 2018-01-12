@@ -16,21 +16,27 @@ let task = new cron.CronJob({
 task.start()
 
 function databaseMigration() {
+  console.log("Migration started at " + new Date() + " **************")
+
   /*Create the sequelize connection*/
   let sequelize = new Sequelize(process.env.SQL_URL, {logging: false})
+  console.log("Connected to SQL DB")
+
   var sequelizeDb = {}
   sequelizeDb.sequelize = sequelize
   sequelizeDb.Sequelize = Sequelize
 
   // Connection done
   migration.getCollectionNames().then((collectionNames)=>{
-    console.log('Collection names recovered');
+    console.log('Collection names recovered')
+
     let tablesPromises = []
     for (var i = 0; i < collectionNames.length; i++) {
       tablesPromises.push(migration.initiateTable(collectionNames[i], sequelizeDb))
     }
 
     return Promise.all(tablesPromises).then(()=>{
+      console.log("Creating tables...")
       //Data is streamed
       return sequelizeDb.sequelize.sync({force: true}).then(()=>{
         // Tables were created
@@ -46,6 +52,8 @@ function databaseMigration() {
           console.log('All rows inserted');
 
 					let message = "Migration successfull at " + new Date() + " \r\n"
+
+          console.log(message)
 
 					fs.appendFile("logs.txt", message, (err)=>{
 						if(err) console.log(err);
@@ -63,4 +71,4 @@ function databaseMigration() {
   })
 
 }
-databaseMigration()
+//databaseMigration()
