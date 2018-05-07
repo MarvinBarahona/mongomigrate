@@ -49,7 +49,7 @@ function initiateTable(collName, sequelizeDb) {
       let database = client.db(process.env.MONGO_DB_NAME)
 
       // We get a document from the collection to create a schema, this works assuming all documents are equal
-      database.collection(collName).find().limit(1).forEach(document=>{
+      database.collection(collName).find().sort([["$natural", -1]]).limit(1).forEach(document=>{
         getSchema(document, sequelizeDb, collName)
         client.close()
         resolve()
@@ -66,47 +66,50 @@ function initiateTable(collName, sequelizeDb) {
 // name is the collection name, which will be the table named
 // parent is the collection parent name
 function getSchema(obj, sequelizeDb, name=null, parent=null) {
-    let table = {}
-    if(obj.length > 1) obj = obj[0]
-    if(parent){
-      table[parent+'_id'] = 'string'
-      name = parent + "_" + name
-    }
+  if(!ignore(name)){
+      let table = {}
+      if(obj.length >= 1) obj = obj[0]
+      if(parent){
+        table[parent+'_id'] = 'string'
+        name = parent + "_" + name
+      }
 
-    console.log("Creating " + name + " model")
+      console.log("Creating " + name + " model")
 
-    for (var key in obj) {
-        if(typeof obj[key] != "function"){     //we don't want to print functions
-            var specificDataTypes=[Date,Array];    //specify the specific data types you want to check
-            var type ="";
-            for(var i in specificDataTypes){       // looping over [Date,Array]
-                if(obj[key] instanceof specificDataTypes[i]){      //if the current property is instance of the DataType
-                        type = specificDataTypes[i].name
-                        break;
-                }
-            }
-
-            if(key === '_id') table['_id'] =  'string'
-            else if(key === 'id') table[name+"_id"] = 'string'
-            else if(!obj[key]) table[key] = 'string'
-            else if (typeof obj[key] == "object") {
-              switch (type) {
-                case 'Date':
-                  table[key] = 'date'
-                  break;
-                case 'Array':
-                  getSchema(obj[key], sequelizeDb, key, name) //Recursive approach
-                  break;
-                default:
-                  getSchema(obj[key], sequelizeDb, key, name)
+      for (var key in obj) {
+          if(typeof obj[key] != "function"){     //we don't want to print functions
+              var specificDataTypes=[Date,Array];    //specify the specific data types you want to check
+              var type ="";
+              for(var i in specificDataTypes){       // looping over [Date,Array]
+                  if(obj[key] instanceof specificDataTypes[i]){      //if the current property is instance of the DataType
+                          type = specificDataTypes[i].name
+                          break;
+                  }
               }
-            }
-            else{
-                table[key] =  typeof obj[key]
-            }
-        }
+
+              if(key === '_id') table['_id'] =  'string'
+              else if(key === 'id') table[name+"_id"] = 'string'
+              else if(key.includes("Id")) table[key] = 'string'
+              else if(!obj[key]) table[key] = 'string'
+              else if (typeof obj[key] == "object") {
+                switch (type) {
+                  case 'Date':
+                    table[key] = 'date'
+                    break;
+                  case 'Array':
+                    getSchema(obj[key], sequelizeDb, key, name) //Recursive approach
+                    break;
+                  default:
+                    getSchema(obj[key], sequelizeDb, key, name)
+                }
+              }
+              else{
+                  table[key] =  typeof obj[key]
+              }
+          }
+      }
+      createTable(table, sequelizeDb, name)
     }
-    createTable(table, sequelizeDb, name)
 }
 
 
@@ -141,7 +144,6 @@ function createTable(schema, conn, modelName) {
   conn[model.name] = model
 
   console.log(modelName + " model created")
-  return model
 }
 
 // Creates a table row based on a documents
@@ -189,48 +191,64 @@ function fillTable(name, sequelizeDb) {
 // promiseArray is an array containing all the promises that will be later executed to do the actual insertion
 // parent represents the parent table id
 function insertRow(obj, name, sequelizeDb, promiseArray, parentName=null, parentId=null) {
-  let table = {}
-  if(obj.length > 1) obj = obj[0]
-  if(parentName){
-    table[parentName + '_id'] = parentId.toString()
-    name = parentName + "_" + name
-  }
-  for (var key in obj) {
-      if(typeof obj[key] != "function"){     //we don't want to print functions
-          var specificDataTypes=[Date,Array];    //specify the specific data types you want to check
-          var type ="";
-          for(var i in specificDataTypes){       // looping over [Date,Array]
-              if(obj[key] instanceof specificDataTypes[i]){      //if the current property is instance of the DataType
-                      type = specificDataTypes[i].name
-                      break;
-              }
-          }
+  if(!ignore(name)){
+    let table = {}
 
-          if(key === '_id') table['_id'] =  obj['_id'].toString()
-          else if(key === 'id') table[name+"_id"] = obj['id'].toString()
-          else if(!obj[key]) table[key] = null
-          else if (typeof obj[key] == "object") {
-            switch (type) {
-              case 'Date':
-                table[key] = obj[key].toString()
-                break;
-              case 'Array':
-                insertRow(obj[key], key, sequelizeDb, promiseArray, name, obj['_id'] || parentId || "N/A")
-                break;
-              default:
-                insertRow(obj[key], key, sequelizeDb, promiseArray, name, obj['_id'] || parentId || "N/A")
+    if(parentName){
+      table[parentName + '_id'] = parentId.toString()
+      name = parentName + "_" + name
+    }
+    for (var key in obj) {
+        if(typeof obj[key] != "function"){     //we don't want to print functions
+            var specificDataTypes=[Date,Array];    //specify the specific data types you want to check
+            var type ="";
+            for(var i in specificDataTypes){       // looping over [Date,Array]
+                if(obj[key] instanceof specificDataTypes[i]){      //if the current property is instance of the DataType
+                        type = specificDataTypes[i].name
+                        break;
+                }
             }
-          }
-          else{
-              table[key] =  obj[key]
-          }
-      }
-  }
 
-  // We create the promise to insert the row with the custom schema
-  promiseArray.push(sequelizeDb[name].create(table))
+            if(key === '_id') table['_id'] =  obj['_id'].toString()
+            else if(key === 'id') table[name+"_id"] = obj['id'].toString()
+            else if(key.includes("Id")) table[key] = obj[key].toString()
+            else if(!obj[key]) table[key] = null
+            else if (typeof obj[key] == "object") {
+              switch (type) {
+                case 'Date':
+                  table[key] = obj[key].toString()
+                  break;
+                case 'Array':
+                  obj[key].forEach((child_obj) => {
+                    insertRow(child_obj, key, sequelizeDb, promiseArray, name, obj['_id'] || parentId || "N/A")
+                  })
+                  break;
+                default:
+                  insertRow(obj[key], key, sequelizeDb, promiseArray, name, obj['_id'] || parentId || "N/A")
+              }
+            }
+            else{
+                table[key] =  obj[key]
+            }
+        }
+    }
+
+    // We create the promise to insert the row with the custom schema
+    promiseArray.push(sequelizeDb[name].create(table))
+  }
 }
 
+
+function ignore(obj_name){
+  let ignored_objects = process.env.IGNORE.split(" ");
+  let ignored = false;
+
+  ignored_objects.forEach((obj) => {
+    if(obj === obj_name) ignored = true;
+  });
+
+  return ignored;
+}
 
 
 

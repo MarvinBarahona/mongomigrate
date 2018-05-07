@@ -35,10 +35,10 @@ function databaseMigration() {
       tablesPromises.push(migration.initiateTable(collectionNames[i], sequelizeDb))
     }
 
-    return Promise.all(tablesPromises).then(()=>{
+    Promise.all(tablesPromises).then(()=>{
       console.log("Creating tables...")
       //Data is streamed
-      return sequelizeDb.sequelize.sync({force: true}).then(()=>{
+      sequelizeDb.sequelize.sync({force: true}).then(()=>{
         // Tables were created
         console.log('Tables created');
         let promises = []
@@ -47,7 +47,7 @@ function databaseMigration() {
           promises.push(migration.fillTable(collectionNames[i], sequelizeDb))
         }
 
-        return Promise.all(promises).then(()=>{
+        Promise.all(promises).then(()=>{
           // All done
           console.log('All rows inserted');
 
@@ -71,4 +71,5 @@ function databaseMigration() {
   })
 
 }
-//databaseMigration()
+
+// databaseMigration()
