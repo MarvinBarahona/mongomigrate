@@ -1,5 +1,7 @@
 import mongodb from 'mongodb'
 import dotenv from 'dotenv'
+import fs from 'fs';
+
 dotenv.config()
 
 const mongo = mongodb.MongoClient
@@ -39,22 +41,32 @@ function getCollectionNames() {
 function initiateTable(collName, sequelizeDb) {
   return new Promise((resolve, reject)=>{
 
-    mongo.connect(process.env.MONGO_URL, (err, client)=>{
+    let modelPath = "./models/" + collName + ".js";
 
-      if(err){
-        console.log(err);
-        reject(err)
-      }
+    if(fs.existsSync(modelPath)){
+      console.log("Using js file for", collName)
+      let document = require("." + modelPath);
+      getSchema(document, sequelizeDb, collName)
+      resolve()
+    }
+    else{
+      mongo.connect(process.env.MONGO_URL, (err, client)=>{
 
-      let database = client.db(process.env.MONGO_DB_NAME)
+        if(err){
+          console.log(err);
+          reject(err)
+        }
 
-      // We get a document from the collection to create a schema, this works assuming all documents are equal
-      database.collection(collName).find().sort([["$natural", -1]]).limit(1).forEach(document=>{
-        getSchema(document, sequelizeDb, collName)
-        client.close()
-        resolve()
+        let database = client.db(process.env.MONGO_DB_NAME)
+
+        // We get a document from the collection to create a schema, this works assuming all documents are equal
+        database.collection(collName).find().limit(1).forEach(document=>{
+          getSchema(document, sequelizeDb, collName)
+          client.close()
+          resolve()
+        })
       })
-    })
+    }
   })
 
 }

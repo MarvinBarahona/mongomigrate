@@ -72,4 +72,4 @@ function databaseMigration() {
 
 }
 
-// databaseMigration()
+databaseMigration()
